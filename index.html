@@ -47,8 +47,7 @@ input[type=range]{width:100%}
  </div>
 </div>
 
-<div class="card"><h2>١) من منظور راصد واقف على الأرض</h2><canvas id="cg"></canvas></div>
-<div class="card"><h2>٢) من منظور سائق السيارة 2 (السيارة 2 تبدو ساكنة)</h2><canvas id="cr"></canvas></div>
+<div class="card"><h2>من منظور راصد واقف على الأرض</h2><canvas id="cg"></canvas></div>
 
 <div class="card res" id="res"></div>
 <p class="note">السرعة النسبية للسيارة 1 بالنسبة للسيارة 2: v<sub>12</sub> = v<sub>1</sub> − v<sub>2</sub> (بمراعاة الإشارة، الاتجاه إلى اليمين موجب)</p>
@@ -58,9 +57,9 @@ input[type=range]{width:100%}
 const $=id=>document.getElementById(id);
 let mode='same',playing=true,x1=0,x2=0,last=performance.now();
 const K=0.2778*5; // km/h -> px/s
-const cg=$('cg'),cr=$('cr');
+const cg=$('cg');
 function fit(c){const r=devicePixelRatio||1,w=c.clientWidth;c.width=w*r;c.height=220*r;c.getContext('2d').setTransform(r,0,0,r,0,0);c.w=w}
-function resize(){fit(cg);fit(cr)}addEventListener('resize',resize);resize();
+function resize(){fit(cg)}addEventListener('resize',resize);resize();
 
 const v1=()=>+$('s1').value, v2=()=>+$('s2').value*(mode==='same'?1:-1);
 
@@ -112,10 +111,6 @@ function update(t){
  if(playing){x1+=v1()*K*dt;x2+=v2()*K*dt}
  const W=cg.w;
  scene(cg,x1,x2,v1()*K,v2()*K,0,false);
- // frame of car 2: car 2 fixed, ground shifts with -x2
- const cx=W*0.3,d=x1-x2,span=W+160;
- const rx=((d+cx+80)%span+span)%span-80;
- scene(cr,rx,cx,0,0,-x2,true);
  requestAnimationFrame(update);
 }
 function text(){
