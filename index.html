@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>السرعة النسبية بين سيارتين</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#5d6678;--line:#dfe3ea;--c1:#e5484d;--c2:#2f6fed;--rel:#12a150;--accent:#2f6fed;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171d;--card:#1d222b;--text:#eceff4;--muted:#9aa4b5;--line:#2f3644;--c1:#ff6b70;--c2:#6c9bff;--rel:#3ddc84;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171d;--card:#1d222b;--text:#eceff4;--muted:#9aa4b5;--line:#2f3644;--c1:#ff6b70;--c2:#6c9bff;--rel:#3ddc84;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Tajawal,system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:.2rem 0 1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.card h2{font-size:1rem;margin:0 0 6px;color:var(--muted)}
+canvas{width:100%;height:220px;display:block;border-radius:10px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer}
+button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sl{flex:1 1 220px}
+.sl label{display:flex;justify-content:space-between;font-size:.95rem}
+input[type=range]{width:100%}
+.res{font-size:1.1rem;text-align:center;line-height:2}
+.res b{color:var(--rel)}
+.v1{color:var(--c1);font-weight:700}.v2{color:var(--c2);font-weight:700}
+.note{color:var(--muted);font-size:.9rem;text-align:center}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🚗 السرعة النسبية بين سيارتين</h1>
+
+<div class="card">
+ <div class="row" style="margin-bottom:10px">
+  <button id="mSame" class="on">في نفس الاتجاه</button>
+  <button id="mOpp">في اتجاهين متعاكسين</button>
+  <button id="play">⏸ إيقاف</button>
+ </div>
+ <div class="row">
+  <div class="sl"><label><span class="v1">سرعة السيارة 1</span><span class="ltr"><span id="o1">80</span> km/h</span></label><input id="s1" type="range" min="10" max="120" value="80"></div>
+  <div class="sl"><label><span class="v2">سرعة السيارة 2</span><span class="ltr"><span id="o2">50</span> km/h</span></label><input id="s2" type="range" min="10" max="120" value="50"></div>
+ </div>
+</div>
+
+<div class="card"><h2>١) من منظور راصد واقف على الأرض</h2><canvas id="cg"></canvas></div>
+<div class="card"><h2>٢) من منظور سائق السيارة 2 (السيارة 2 تبدو ساكنة)</h2><canvas id="cr"></canvas></div>
+
+<div class="card res" id="res"></div>
+<p class="note">السرعة النسبية للسيارة 1 بالنسبة للسيارة 2: v<sub>12</sub> = v<sub>1</sub> − v<sub>2</sub> (بمراعاة الإشارة، الاتجاه إلى اليمين موجب)</p>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let mode='same',playing=true,x1=0,x2=0,last=performance.now();
+const K=0.2778*5; // km/h -> px/s
+const cg=$('cg'),cr=$('cr');
+function fit(c){const r=devicePixelRatio||1,w=c.clientWidth;c.width=w*r;c.height=220*r;c.getContext('2d').setTransform(r,0,0,r,0,0);c.w=w}
+function resize(){fit(cg);fit(cr)}addEventListener('resize',resize);resize();
+
+const v1=()=>+$('s1').value, v2=()=>+$('s2').value*(mode==='same'?1:-1);
+
+function car(ctx,x,y,color,dir){
+ ctx.save();ctx.translate(x,y);ctx.scale(dir,1);
+ ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(-40,-8,80,22,6);ctx.fill();
+ ctx.beginPath();ctx.roundRect(-22,-22,42,18,6);ctx.fill();
+ ctx.fillStyle='#cfe6ff';ctx.fillRect(-17,-18,15,11);ctx.fillRect(1,-18,15,11);
+ ctx.fillStyle='#111';[-24,24].forEach(wx=>{ctx.beginPath();ctx.arc(wx,14,7,0,7);ctx.fill()});
+ ctx.restore();
+}
+function arrow(ctx,x,y,len,color,label){
+ if(Math.abs(len)<2)return;
+ const d=Math.sign(len);ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=3;
+ ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len,y);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(x+len+d*9,y);ctx.lineTo(x+len,y-6);ctx.lineTo(x+len,y+6);ctx.fill();
+ ctx.font='bold 13px Tajawal,sans-serif';ctx.textAlign='center';ctx.fillText(label,x+len/2,y-9);
+}
+function scene(c,carX1,carX2,vel1,vel2,poleOff,rel){
+ const ctx=c.getContext('2d'),W=c.w,s=getComputedStyle(document.documentElement);
+ const col1=s.getPropertyValue('--c1'),col2=s.getPropertyValue('--c2'),colR=s.getPropertyValue('--rel');
+ ctx.clearRect(0,0,W,220);
+ ctx.fillStyle='#3a404b';ctx.fillRect(0,80,W,120);
+ ctx.fillStyle='#e8c94a';ctx.fillRect(0,138,W,3);
+ ctx.strokeStyle='#8b919c';ctx.lineWidth=2;ctx.setLineDash([]);
+ ctx.beginPath();ctx.moveTo(0,80);ctx.lineTo(W,80);ctx.moveTo(0,200);ctx.lineTo(W,200);ctx.stroke();
+ // poles
+ const sp=160;ctx.fillStyle='#7a828f';
+ for(let p=-2;p<W/sp+2;p++){const px=(((p*sp+poleOff)%(W+sp))+(W+sp))%(W+sp)-sp/2;ctx.fillRect(px-2,62,4,18);ctx.fillRect(px-7,60,14,4)}
+ const wrap=x=>((x+80)%(W+160)+(W+160))%(W+160)-80;
+ const d2=mode==='same'?1:-1;
+ const X1=rel?carX1:wrap(carX1),X2=rel?carX2:wrap(carX2);
+ car(ctx,X2,112,col2,d2);car(ctx,X1,170,col1,1);
+ ctx.fillStyle=col2;ctx.font='bold 13px Tajawal,sans-serif';ctx.textAlign='center';
+ ctx.fillText('2',X2,70+0);ctx.fillStyle=col1;ctx.fillText('1',X1,198-0);
+ // arrows
+ const ink=s.getPropertyValue('--text');
+ if(!rel){
+  arrow(ctx,X2,30,vel2*0.9,col2,'v2 = '+Math.abs(Math.round(vel2/K*0+Math.abs(+$('s2').value)))+' km/h');
+  arrow(ctx,X1,212-0,0,col1,'');
+  arrow(ctx,X1,50-0+0,vel1*0.9,col1,'v1 = '+$('s1').value+' km/h');
+ }else{
+  ctx.fillStyle=ink;ctx.font='13px Tajawal,sans-serif';ctx.textAlign='center';ctx.fillText('v2 = 0 (ساكنة)',X2,30);
+  arrow(ctx,X1,40,(v1()-v2())*0.9,colR,'v12 = '+(v1()-v2())+' km/h');
+ }
+}
+function update(t){
+ const dt=Math.min(.05,(t-last)/1000);last=t;
+ if(playing){x1+=v1()*K*dt;x2+=v2()*K*dt}
+ const W=cg.w;
+ scene(cg,x1,x2,v1()*K,v2()*K,0,false);
+ // frame of car 2: car 2 fixed, ground shifts with -x2
+ const cx=W*0.3,d=x1-x2,span=W+160;
+ const rx=((d+cx+80)%span+span)%span-80;
+ scene(cr,rx,cx,0,0,-x2,true);
+ requestAnimationFrame(update);
+}
+function text(){
+ const a=v1(),b=v2(),r=a-b;let h;
+ $('o1').textContent=a;$('o2').textContent=$('s2').value;
+ if(mode==='same'){
+  h=`<span class="ltr">v<sub>12</sub> = <span class="v1">${a}</span> − <span class="v2">${b}</span> = <b>${r} km/h</b></span><br>`+
+   (r>0?'السيارة 1 تبدو للسائق 2 وكأنها تتقدّم نحو الأمام':r<0?'السيارة 1 تبدو للسائق 2 وكأنها تتراجع للخلف':'السيارتان تبدوان ساكنتين بالنسبة لبعضهما');
+ }else{
+  h=`<span class="ltr">v<sub>12</sub> = <span class="v1">${a}</span> − (<span class="v2">${b}</span>) = <span class="v1">${a}</span> + <span class="v2">${-b}</span> = <b>${r} km/h</b></span><br>السيارة 1 تبدو للسائق 2 وكأنها تقترب بسرعة كبيرة (مجموع السرعتين)`;
+ }
+ $('res').innerHTML=h;
+}
+function setMode(m){mode=m;$('mSame').classList.toggle('on',m==='same');$('mOpp').classList.toggle('on',m==='opp');text()}
+$('mSame').onclick=()=>setMode('same');$('mOpp').onclick=()=>setMode('opp');
+$('s1').oninput=text;$('s2').oninput=text;
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ إيقاف':'▶ تشغيل'};
+text();requestAnimationFrame(update);
+</script>
+</body>
+</html>
